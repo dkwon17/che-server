@@ -24,7 +24,7 @@ public class UserRemovedEvent {
 
   private final String userId;
 
-  public UserRemovedEvent(String userId) {
+  public  UserRemovedEvent(String userId) {
     this.userId = userId;
   }
 

@@ -36,8 +36,10 @@ import javax.ws.rs.core.MediaType;
 import org.eclipse.che.api.core.ApiException;
 import org.eclipse.che.api.core.ServerException;
 import org.eclipse.che.api.core.notification.EventService;
+import org.eclipse.che.api.core.notification.EventSubscriber;
 import org.eclipse.che.api.core.rest.HttpJsonRequestFactory;
 import org.eclipse.che.api.user.server.event.BeforeUserRemovedEvent;
+import org.eclipse.che.api.user.server.event.UserRemovedEvent;
 import org.eclipse.che.commons.annotation.Nullable;
 import org.eclipse.che.commons.lang.IoUtil;
 import org.eclipse.che.core.db.cascade.CascadeEventSubscriber;
@@ -173,7 +175,7 @@ public class KeycloakUserRemover {
   }
 
   @Singleton
-  public static class RemoveUserListener extends CascadeEventSubscriber<BeforeUserRemovedEvent> {
+  public static class RemoveUserListener implements EventSubscriber<UserRemovedEvent> {
     @Inject private EventService eventService;
     @Inject private KeycloakUserRemover keycloakUserRemover;
 
@@ -185,20 +187,23 @@ public class KeycloakUserRemover {
     @PostConstruct
     public void subscribe() {
       if (userRemovalEnabled) {
-        eventService.subscribe(this, BeforeUserRemovedEvent.class);
+        eventService.subscribe(this, UserRemovedEvent.class);
       }
     }
 
     @PreDestroy
     public void unsubscribe() {
       if (userRemovalEnabled) {
-        eventService.unsubscribe(this, BeforeUserRemovedEvent.class);
+        eventService.unsubscribe(this, UserRemovedEvent.class);
       }
     }
 
     @Override
-    public void onCascadeEvent(BeforeUserRemovedEvent event) throws Exception {
-      keycloakUserRemover.removeUserFromKeycloak(event.getUser().getId());
+    public void onEvent(UserRemovedEvent event) {
+      try {
+        keycloakUserRemover.removeUserFromKeycloak(event.getUserId());
+      } catch (Exception e) {
+      }
     }
   }
 }

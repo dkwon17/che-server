@@ -109,6 +109,8 @@ public class JpaUserDao implements UserDao {
     } catch (RuntimeException x) {
       throw new ServerException(x.getLocalizedMessage(), x);
     }
+
+    throw new ServerException("Throw on purpose, after doRemove");
   }
 
   @Override
