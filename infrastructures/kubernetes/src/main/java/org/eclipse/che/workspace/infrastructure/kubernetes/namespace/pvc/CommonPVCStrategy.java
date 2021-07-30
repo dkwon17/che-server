@@ -19,12 +19,22 @@ import static org.eclipse.che.api.user.server.UserManager.PERSONAL_ACCOUNT;
 import static org.eclipse.che.workspace.infrastructure.kubernetes.namespace.KubernetesObjectUtil.newPVC;
 
 import com.google.inject.Inject;
+import io.fabric8.kubernetes.api.model.NamespaceList;
 import io.fabric8.kubernetes.api.model.PersistentVolumeClaim;
+import io.fabric8.kubernetes.api.model.Pod;
 import io.fabric8.kubernetes.api.model.VolumeMount;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.stream.Collectors;
 import javax.inject.Named;
+
+import io.fabric8.kubernetes.client.DefaultKubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClientException;
 import org.eclipse.che.account.spi.AccountImpl;
 import org.eclipse.che.api.core.Page;
 import org.eclipse.che.api.core.ServerException;
@@ -102,6 +112,7 @@ public class CommonPVCStrategy implements WorkspaceVolumesStrategy {
   private final SubPathPrefixes subpathPrefixes;
   private final boolean waitBound;
   private final WorkspaceManager workspaceManager;
+  private List<CompletableFuture<Void>> removeDirsCompletableFutures;
 
   @Inject
   public CommonPVCStrategy(
@@ -131,6 +142,7 @@ public class CommonPVCStrategy implements WorkspaceVolumesStrategy {
     this.podsVolumes = podsVolumes;
     this.subpathPrefixes = subpathPrefixes;
     this.workspaceManager = workspaceManager;
+    this.removeDirsCompletableFutures = new ArrayList<>();
   }
 
   /**
@@ -242,17 +254,19 @@ public class CommonPVCStrategy implements WorkspaceVolumesStrategy {
     AccountImpl account = ((WorkspaceImpl) workspace).getAccount();
     if (isPersonalAccount(account) && accountHasNoWorkspaces(account)) {
       log.debug("Deleting the common PVC: '{}',", configuredPVCName);
+      this.removeDirsCompletableFutures.forEach(CompletableFuture::join);
+      this.removeDirsCompletableFutures.clear();
       deleteCommonPVC(workspace);
       return;
     }
 
     String workspaceId = workspace.getId();
     PersistentVolumeClaim pvc = createCommonPVC(workspaceId);
-    pvcSubPathHelper.removeDirsAsync(
+    this.removeDirsCompletableFutures.add(pvcSubPathHelper.removeDirsAsync(
         workspaceId,
         factory.get(workspace).getName(),
         pvc.getMetadata().getName(),
-        subpathPrefixes.getWorkspaceSubPath(workspaceId));
+        subpathPrefixes.getWorkspaceSubPath(workspaceId)));
   }
 
   private PersistentVolumeClaim replacePVCsWithCommon(
