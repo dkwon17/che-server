@@ -19,12 +19,20 @@ import static org.eclipse.che.api.user.server.UserManager.PERSONAL_ACCOUNT;
 import static org.eclipse.che.workspace.infrastructure.kubernetes.namespace.KubernetesObjectUtil.newPVC;
 
 import com.google.inject.Inject;
-import io.fabric8.kubernetes.api.model.PersistentVolumeClaim;
-import io.fabric8.kubernetes.api.model.VolumeMount;
+import io.fabric8.kubernetes.api.model.*;
+
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.inject.Named;
+
+import io.fabric8.kubernetes.client.DefaultKubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClientException;
 import org.eclipse.che.account.spi.AccountImpl;
 import org.eclipse.che.api.core.Page;
 import org.eclipse.che.api.core.ServerException;
@@ -242,6 +250,16 @@ public class CommonPVCStrategy implements WorkspaceVolumesStrategy {
     AccountImpl account = ((WorkspaceImpl) workspace).getAccount();
     if (isPersonalAccount(account) && accountHasNoWorkspaces(account)) {
       log.debug("Deleting the common PVC: '{}',", configuredPVCName);
+      try (KubernetesClient client = new DefaultKubernetesClient()) {
+
+        client.pods().inNamespace(workspace.getNamespace() + "-che")
+                .waitUntilCondition(pod -> pod.getStatus().getPhase().equals("Succeeded"), 1, TimeUnit.MINUTES);
+
+      } catch (KubernetesClientException | InterruptedException ex) {
+        // Handle exception
+        log.info("Something wrong happened!!!");
+        log.error(ex.getLocalizedMessage());
+      }
       deleteCommonPVC(workspace);
       return;
     }
