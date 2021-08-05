@@ -19,13 +19,11 @@ import com.google.common.annotations.VisibleForTesting;
 import com.google.common.base.Predicate;
 import com.google.common.base.Strings;
 import com.google.common.util.concurrent.ThreadFactoryBuilder;
-import io.fabric8.kubernetes.api.model.Container;
-import io.fabric8.kubernetes.api.model.ContainerBuilder;
-import io.fabric8.kubernetes.api.model.Pod;
-import io.fabric8.kubernetes.api.model.PodBuilder;
-import io.fabric8.kubernetes.api.model.PodStatus;
+import io.fabric8.kubernetes.api.model.*;
+
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -35,6 +33,9 @@ import javax.annotation.PreDestroy;
 import javax.inject.Inject;
 import javax.inject.Named;
 import javax.inject.Singleton;
+
+import io.fabric8.kubernetes.client.DefaultKubernetesClient;
+import io.fabric8.kubernetes.client.KubernetesClient;
 import org.eclipse.che.api.core.model.workspace.runtime.RuntimeIdentity;
 import org.eclipse.che.api.workspace.server.spi.InfrastructureException;
 import org.eclipse.che.commons.lang.concurrent.LoggingUncaughtExceptionHandler;
@@ -207,14 +208,37 @@ public class PVCSubPathHelper {
       String[] commandBase,
       Map<String, String> startOptions,
       String... arguments) {
+
     final String jobName = commandBase[0];
     final String podName = jobName + '-' + workspaceId;
     final String[] command = buildCommand(commandBase, arguments);
     final Pod pod = newPod(podName, pvcName, command);
+
+      try (final KubernetesClient client = new DefaultKubernetesClient()) {
+        PersistentVolumeClaimList persistentVolumeClaimList = client.persistentVolumeClaims().inNamespace(namespace).list();
+        boolean pvcExists = false;
+        for (PersistentVolumeClaim pvc : persistentVolumeClaimList.getItems()) {
+          if (pvc.getMetadata().getName().equals(pvcName)) {
+            pvcExists = true;
+            if (pvc.getStatus().getPhase().equals("Terminating")) {
+              LOG.info("DON'T EXECUTE, TERMINATING! " + workspaceId);
+              return;
+            }
+            break;
+          }
+        }
+
+        if (!pvcExists) {
+          LOG.info("DON'T EXECUTE, DNE! " + workspaceId);
+          return;
+        }
+      }
+
+
     securityContextProvisioner.provision(pod.getSpec());
     nodeSelectorProvisioner.provision(pod.getSpec());
     tolerationsProvisioner.provision(pod.getSpec());
-
+    LOG.info("EXECUTE! " + workspaceId);
     KubernetesDeployments deployments = null;
     try {
       deployments = factory.access(workspaceId, namespace).deployments();
@@ -241,6 +265,7 @@ public class PVCSubPathHelper {
         deployments.stopWatch();
         try {
           deployments.delete(podName);
+          LOG.info("DONE! " + workspaceId);
         } catch (InfrastructureException ignored) {
         }
       }
