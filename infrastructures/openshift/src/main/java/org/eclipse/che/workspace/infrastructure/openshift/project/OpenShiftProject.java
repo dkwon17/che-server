@@ -21,6 +21,8 @@ import io.fabric8.openshift.api.model.Route;
 import io.fabric8.openshift.client.OpenShiftClient;
 import java.util.Map;
 import java.util.concurrent.Executor;
+import java.util.concurrent.TimeUnit;
+
 import org.eclipse.che.api.workspace.server.spi.InfrastructureException;
 import org.eclipse.che.api.workspace.server.spi.InternalInfrastructureException;
 import org.eclipse.che.workspace.infrastructure.kubernetes.CheServerKubernetesClientFactory;
@@ -113,7 +115,12 @@ public class OpenShiftProject extends KubernetesNamespace {
     String workspaceId = getWorkspaceId();
     String projectName = getName();
 
+    long startTime = System.nanoTime();
     OpenShiftClient osClient = cheServerOpenshiftClientFactory.createOC();
+    long endTime = System.nanoTime();
+        LOG.info(
+          "OpenShiftClient#createOC: {}ms",
+          TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
     Project project = get(projectName, osClient);
 
     if (project == null) {
@@ -125,15 +132,45 @@ public class OpenShiftProject extends KubernetesNamespace {
       }
 
       if (initWithCheServerSa) {
+        startTime = System.nanoTime();
         create(projectName, osClient);
+        endTime = System.nanoTime();
+        LOG.info(
+          "OpenShiftProject#create: {}ms",
+          TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
+        startTime = System.nanoTime();
         waitDefaultServiceAccount(projectName, osClient);
+        endTime = System.nanoTime();
+        LOG.info(
+          "OpenShiftProject#waitDefaultServiceAccount: {}ms",
+          TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
       } else {
+        startTime = System.nanoTime();
         create(projectName, openShiftClientFactory.createOC(workspaceId));
+        endTime = System.nanoTime();
+        LOG.info(
+          "OpenShiftProject#create: {}ms",
+          TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
+        startTime = System.nanoTime();
         waitDefaultServiceAccount(projectName, openShiftClientFactory.create(workspaceId));
+        endTime = System.nanoTime();
+        LOG.info(
+          "OpenShiftProject#waitDefaultServiceAccount: {}ms",
+          TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
       }
     }
+    startTime = System.nanoTime();
     label(osClient.namespaces().withName(projectName).get(), labels);
+    endTime = System.nanoTime();
+    LOG.info(
+      "OpenShiftProject#label: {}ms",
+      TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
+    startTime = System.nanoTime();
     annotate(osClient.namespaces().withName(projectName).get(), annotations);
+    endTime = System.nanoTime();
+    LOG.info(
+      "OpenShiftProject#annotate: {}ms",
+      TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
   }
 
   /**

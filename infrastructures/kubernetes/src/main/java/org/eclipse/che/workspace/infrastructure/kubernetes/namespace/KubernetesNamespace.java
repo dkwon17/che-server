@@ -139,18 +139,43 @@ public class KubernetesNamespace {
    */
   void prepare(boolean canCreate, Map<String, String> labels, Map<String, String> annotations)
       throws InfrastructureException {
+    long startTime = System.nanoTime();
     KubernetesClient client = cheSAClientFactory.create(workspaceId);
+    long endTime = System.nanoTime();
+    LOG.info(
+      "CheServerKubernetesClientFactory.create: {}ms",
+      TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
+    startTime = System.nanoTime();
     Namespace namespace = get(name, client);
+    endTime = System.nanoTime();
+    LOG.info(
+      "KuberneteNamespace.get: {}ms",
+      TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
 
     if (namespace == null) {
       if (!canCreate) {
         throw new InfrastructureException(
             format("Creating the namespace '%s' is not allowed, yet it was not found.", name));
       }
+      startTime = System.nanoTime();
       create(name, client);
+      endTime = System.nanoTime();
+      LOG.info(
+        "KuberneteNamespace.create: {}ms",
+        TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
     }
+    startTime = System.nanoTime();
     label(client.namespaces().withName(name).get(), labels);
+    endTime = System.nanoTime();
+    LOG.info(
+      "KuberneteNamespace.label: {}ms",
+      TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
+    startTime = System.nanoTime();
     annotate(client.namespaces().withName(name).get(), annotations);
+    endTime = System.nanoTime();
+    LOG.info(
+      "KuberneteNamespace.annotate: {}ms",
+      TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
   }
 
   /**

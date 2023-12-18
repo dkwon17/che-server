@@ -36,6 +36,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -233,8 +234,14 @@ public class KubernetesNamespaceFactory {
   public Optional<KubernetesNamespaceMeta> fetchNamespace(String name)
       throws InfrastructureException {
     try {
+
+      long startTime = System.nanoTime();
       Namespace namespace =
           cheServerKubernetesClientFactory.create().namespaces().withName(name).get();
+      long endTime = System.nanoTime();
+      LOG.info(
+        "KubernetesNamespaceFactory.fetchNamespace: {}ms",
+        TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
       if (namespace == null) {
         return Optional.empty();
       } else {
@@ -286,11 +293,15 @@ public class KubernetesNamespaceFactory {
     Map<String, String> namespaceAnnotationsEvaluated =
         evaluateAnnotationPlaceholders(resolutionCtx);
 
+    long startTime = System.nanoTime();
     namespace.prepare(
         canCreateNamespace(),
         labelNamespaces ? namespaceLabels : emptyMap(),
         annotateNamespaces ? namespaceAnnotationsEvaluated : emptyMap());
-
+    long endTime = System.nanoTime();
+        LOG.info(
+          "KubernetesNamespace.prepare: {}ms",
+          TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
     configureNamespace(resolutionCtx, namespace.getName());
 
     return namespace;
@@ -528,9 +539,17 @@ public class KubernetesNamespaceFactory {
   protected void configureNamespace(
       NamespaceResolutionContext namespaceResolutionContext, String namespaceName)
       throws InfrastructureException {
+    LOG.info("Starting namespace configuration for {}", namespaceName);
     for (NamespaceConfigurator configurator : namespaceConfigurators) {
+      long startTime = System.nanoTime();
       configurator.configure(namespaceResolutionContext, namespaceName);
+      long endTime = System.nanoTime();
+      LOG.info(
+        "{}: {}ms",
+        configurator.getClass().getSimpleName(),
+        TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
     }
+    LOG.info("Completed namespace configuration for {}", namespaceName);
   }
 
   /**

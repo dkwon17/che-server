@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 import javax.inject.Named;
 import org.eclipse.che.api.core.model.workspace.Workspace;
@@ -109,13 +110,16 @@ public class OpenShiftProjectFactory extends KubernetesNamespaceFactory {
         new NamespaceResolutionContext(identity.getWorkspaceId(), subject.getUserId(), userName);
     Map<String, String> namespaceAnnotationsEvaluated =
         evaluateAnnotationPlaceholders(resolutionCtx);
-
+    long startTime = System.nanoTime();
     osProject.prepare(
         canCreateNamespace(),
         initWithCheServerSa && !isNullOrEmpty(oAuthIdentityProvider),
         labelNamespaces ? namespaceLabels : emptyMap(),
         annotateNamespaces ? namespaceAnnotationsEvaluated : emptyMap());
-
+    long endTime = System.nanoTime();
+        LOG.info(
+          "OpenshiftProjectFactory#prepare: {}ms",
+          TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
     configureNamespace(resolutionCtx, osProject.getName());
 
     return osProject;
@@ -169,7 +173,12 @@ public class OpenShiftProjectFactory extends KubernetesNamespaceFactory {
 
   private Optional<Project> fetchNamespaceObject(String name) throws InfrastructureException {
     try {
+      long startTime = System.nanoTime();
       Project project = cheServerOpenshiftClientFactory.createOC().projects().withName(name).get();
+      long endTime = System.nanoTime();
+      LOG.info(
+        "OpenShiftProjectFactory#fetchNamespace: {}ms",
+        TimeUnit.NANOSECONDS.toMillis(endTime - startTime));
       return Optional.ofNullable(project);
     } catch (KubernetesClientException e) {
       if (e.getCode() == 403) {

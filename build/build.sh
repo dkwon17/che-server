@@ -41,7 +41,7 @@ init() {
   BOLD='\033[1m'
   UNDERLINE='\033[4m'
 
-  ORGANIZATION="quay.io/eclipse"
+  ORGANIZATION="quay.io/dkwon17"
   PREFIX="che"
   TAG="next"
   SKIP_TESTS=false
@@ -138,14 +138,14 @@ build_image() {
     -e "s;\${BUILD_PREFIX};${PREFIX};" \
     -e "s;\${BUILD_TAG};${TAG};" \
     > ${DIR}/.Dockerfile
-  cd "${DIR}" && docker build -f ${DIR}/.Dockerfile -t ${IMAGE_NAME} ${BUILD_ARGS} .
+  cd "${DIR}" && podman build -f ${DIR}/.Dockerfile -t ${IMAGE_NAME} ${BUILD_ARGS} .
   DOCKER_BUILD_STATUS=$?
   rm ${DIR}/.Dockerfile
   if [ $DOCKER_BUILD_STATUS -eq 0 ]; then
     printf "Build of ${BLUE}${IMAGE_NAME} ${GREEN}[OK]${NC}\n"
     if [ ! -z "${SHA_TAG}" ]; then
       SHA_IMAGE_NAME=${ORGANIZATION}/${PREFIX}-${NAME}:${SHA_TAG}
-      docker tag ${IMAGE_NAME} ${SHA_IMAGE_NAME}
+      podman tag ${IMAGE_NAME} ${SHA_IMAGE_NAME}
       DOCKER_TAG_STATUS=$?
       if [ $DOCKER_TAG_STATUS -eq 0 ]; then
         printf "Re-tagging with SHA based tag ${BLUE}${SHA_IMAGE_NAME} ${GREEN}[OK]${NC}\n"
@@ -157,7 +157,7 @@ build_image() {
     if [ ! -z "${IMAGE_ALIASES}" ]; then
       for TMP_IMAGE_NAME in ${IMAGE_ALIASES}
       do
-        docker tag ${IMAGE_NAME} ${TMP_IMAGE_NAME}:${TAG}
+        podman tag ${IMAGE_NAME} ${TMP_IMAGE_NAME}:${TAG}
         DOCKER_TAG_STATUS=$?
         if [ $DOCKER_TAG_STATUS -eq 0 ]; then
           printf "  /alias ${BLUE}${TMP_IMAGE_NAME}:${TAG}${NC} ${GREEN}[OK]${NC}\n"
